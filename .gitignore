@@ -1,0 +1,15 @@
+# Artefacts de compilation
+/target/
+
+# Enregistrements produits par rscap : volumineux, reproductibles, jamais
+# du code source. Le chemin par defaut de rscap.toml est recording.mp4.
+*.mp4
+*.mkv
+
+# Journaux (--log-file)
+*.log
+
+# Divers editeurs / systeme
+*.swp
+*~
+.DS_Store

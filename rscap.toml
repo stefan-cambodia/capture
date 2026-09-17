@@ -1,0 +1,133 @@
+# Configuration de rscap.
+#
+# Toutes les valeurs ci-dessous sont les valeurs par defaut : ce fichier est
+# equivalent a ne pas en fournir du tout. Chaque cle est validee au demarrage,
+# avant qu'aucune ressource ne soit ouverte.
+#
+#   rscap --config rscap.toml
+#
+# Les options de la ligne de commande sont prioritaires sur ce fichier.
+# `rscap --print-config` affiche la configuration effective apres fusion.
+
+[video]
+# Images par seconde visees. Minimum accepte par le projet : 30.
+fps = 60
+
+# "h264" | "hevc" | "av1"
+# H.264 est le defaut : c'est le seul codec lu partout sans exception.
+codec = "h264"
+
+# "low" | "medium" | "high" | "very_high"
+# Pilote le debit quand `bitrate = 0`, et le quantificateur en mode "cq".
+quality = "high"
+
+# Debit video cible, en bits par seconde. 0 = calcule depuis `quality`, la
+# resolution et le framerate (environ 26 Mb/s en 1440p60 "high").
+bitrate = 0
+
+# "vbr" | "cbr" | "cq"
+#   vbr : debit variable borne. Le meilleur choix pour une capture d'ecran,
+#         ou de longues plages sont fixes.
+#   cbr : debit constant. Utile pour la diffusion, gaspilleur sur un fichier.
+#   cq  : qualite constante, taille imprevisible.
+rate_control = "vbr"
+
+# Intervalle entre images cles, en secondes. Plus court = navigation plus
+# fluide dans le fichier et reprise plus rapide, mais fichier plus gros.
+keyframe_interval_secs = 2.0
+
+# Nombre de trames B. 0 par defaut : elles ajoutent de la latence d'encodage
+# et n'apportent presque rien sur une capture d'ecran.
+b_frames = 0
+
+# Preset de l'encodeur. Vide = choix automatique adapte a l'encodeur retenu
+# ("p4" pour NVENC, "veryfast" pour x264/QSV, "9" pour SVT-AV1).
+preset = ""
+
+# "auto"  : materiel si disponible, repli logiciel sinon.
+# "force" : materiel obligatoire, echec au demarrage sinon.
+# "off"   : logiciel uniquement.
+hardware = "auto"
+
+# Force un encodeur precis, par exemple "h264_vaapi", "h264_nvenc", "libx264".
+# Vide = selection automatique (voir docs/PIPELINE.md).
+encoder = ""
+
+# Noeud de rendu DRM pour VAAPI/QSV. Vide = detection automatique.
+# Exemple : "/dev/dri/renderD128"
+render_node = ""
+
+# "cfr" : grille reguliere 1/fps, les trous sont combles par repetition
+#         d'image. Compatible avec tous les lecteurs et logiciels de montage.
+# "vfr" : chaque image garde son horodatage de capture. Fichier plus petit
+#         sur un ecran fixe, mais mal gere par certains editeurs.
+pacing = "cfr"
+
+# Marge laissee a une image pour arriver avant que son slot ne soit emis.
+# Doit depasser la latence de livraison de la source, visible en p99 de
+# « capture » dans `--benchmark`. Une periode d'image complete est un bon
+# defaut pour un enregistreur, ou la latence n'a aucune importance.
+lookahead_ms = 16
+
+# Fils de conversion colorimetrique (BGRx -> NV12). 0 = automatique.
+convert_threads = 0
+
+[audio]
+enabled = true
+
+# 8000 | 16000 | 22050 | 32000 | 44100 | 48000
+sample_rate = 48000
+
+# 1 (mono) ou 2 (stereo).
+channels = 2
+
+# Debit AAC, en bits par seconde.
+bitrate = 192000
+
+# Source de capture. Vide = moniteur de la sortie par defaut, c'est-a-dire le
+# son qui sort des haut-parleurs (et non le microphone).
+# `rscap --list-audio` liste les moniteurs disponibles.
+device = ""
+
+# Taille d'un fragment de capture, en millisecondes. Plus petit = moins de
+# latence, mais plus de reveils du thread audio.
+fragment_ms = 10
+
+# Asservit l'horloge audio sur l'horloge monotone. A laisser actif : sans
+# cela, l'ecart entre l'horloge de la carte son et celle du systeme
+# s'accumule (typiquement 50 ppm, soit 180 ms par heure).
+drift_correction = true
+
+# Au-dela de cet ecart, on considere qu'il y a eu un vrai trou (peripherique
+# suspendu, machine en veille) et on insere du silence au lieu de corriger
+# progressivement.
+max_drift_ms = 200
+
+[output]
+path = "recording.mp4"
+
+# "mp4" | "mkv"
+format = "mp4"
+
+# MP4 fragmente : le fichier reste lisible meme apres un arret brutal, au prix
+# d'une compatibilite moindre avec certains logiciels de montage.
+fragmented = false
+
+# Taille du tampon d'ecriture, en kilo-octets. Des ecritures larges et peu
+# frequentes valent mieux que beaucoup de petites.
+writer_buffer_kb = 4096
+
+[pipeline]
+# Images en vol entre capture et encodage. 8 images a 60 fps = 133 ms de
+# marge : assez pour absorber une rafale, assez court pour que la latence
+# reste bornee.
+video_queue = 8
+
+# Fragments audio en vol. 64 fragments de 10 ms = 640 ms.
+audio_queue = 64
+
+# Paquets encodes en attente d'ecriture.
+packet_queue = 256
+
+# Tampons video prealloues. Doit valoir au moins `video_queue + 2`.
+frame_pool = 12

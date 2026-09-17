@@ -14,6 +14,18 @@ path = "src/main.rs"
 name = "rscap"
 path = "src/lib.rs"
 
+# L'interface graphique est un second binaire, pas une option du premier :
+# `rscap` reste utilisable sur une machine sans GTK, et une compilation
+# sans `--features gui` ne telecharge meme pas les liaisons.
+[[bin]]
+name              = "rscap-gui"
+path              = "src/bin/rscap-gui.rs"
+required-features = ["gui"]
+
+[features]
+default = []
+gui     = ["dep:gtk4", "dep:libadwaita"]
+
 [dependencies]
 ffmpeg-next       = { version = "9.0", default-features = false, features = ["codec", "format", "software-scaling", "software-resampling", "filter"] }
 crossbeam-channel = "0.5"
@@ -29,6 +41,13 @@ toml              = "1"
 libc              = "0.2"
 ctrlc             = "3"
 hdrhistogram      = { version = "7", default-features = false }
+
+# Interface graphique, optionnelle (feature "gui").
+# `v4_10` donne `gtk::FileDialog` et `v1_5` donne `adw::AlertDialog` : les
+# anciennes API de dialogue sont depreciees et se comportent mal sous Wayland.
+# Elles fixent le minimum requis a GTK 4.10 et libadwaita 1.5.
+gtk4              = { version = "0.11", optional = true, features = ["v4_10"] }
+libadwaita        = { version = "0.9", optional = true, features = ["v1_5"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 pipewire                = "0.10"

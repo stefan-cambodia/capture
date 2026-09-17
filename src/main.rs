@@ -370,69 +370,7 @@ fn list_audio() -> Result<()> {
 }
 
 fn probe(cfg: &Config) -> Result<()> {
-    ffmpeg_next::init().map_err(|e| RecorderError::PipelineAborted(format!("ffmpeg : {e}")))?;
-    let system = rscap::encoder::hwdetect::detect();
-
-    println!("Materiel");
-    println!("  CPU              : {}", system.cpu);
-    println!("  Fils d'execution : {}", system.cpu_threads);
-    if system.gpus.is_empty() {
-        println!("  GPU              : aucun detecte");
-    }
-    for gpu in &system.gpus {
-        println!("  GPU              : {gpu}");
-    }
-    #[cfg(target_os = "linux")]
-    println!("  Session          : {}", rscap::capture::linux::session_type());
-
-    println!("\nEncodeurs candidats pour {} (ordre d'essai)", cfg.video.codec);
-    let candidates = rscap::encoder::hwdetect::candidates(
-        cfg.video.codec,
-        cfg.video.hardware,
-        system.vendor(),
-        &cfg.video.encoder,
-    );
-    for cand in &candidates {
-        let present = ffmpeg_next::encoder::find_by_name(cand.name).is_some();
-        println!(
-            "  {:<14} {:<10} {}",
-            cand.name,
-            if cand.accel.is_hardware() {
-                "materiel"
-            } else {
-                "logiciel"
-            },
-            if present {
-                "present dans ffmpeg"
-            } else {
-                "ABSENT de cette build"
-            }
-        );
-    }
-
-    // Seule l'ouverture reelle prouve qu'un encodeur fonctionne.
-    println!("\nOuverture reelle a {}x{}", 1920, 1080);
-    let mut spec_cfg = cfg.video.clone();
-    spec_cfg.encoder = String::new();
-    match rscap::encoder::video::VideoEncoder::open(&rscap::encoder::video::VideoEncoderSpec {
-        width: 1920,
-        height: 1080,
-        cfg: spec_cfg,
-        global_header: true,
-        system: system.clone(),
-    }) {
-        Ok(enc) => println!(
-            "  retenu : {} ({}, {})",
-            enc.name(),
-            enc.codec(),
-            if enc.is_hardware() {
-                "materiel"
-            } else {
-                "logiciel"
-            }
-        ),
-        Err(e) => println!("  aucun encodeur utilisable : {e}"),
-    }
+    print!("{}", rscap::encoder::probe_report(cfg)?);
     Ok(())
 }
 

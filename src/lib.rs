@@ -7,6 +7,8 @@ pub mod capture;
 pub mod config;
 pub mod encoder;
 pub mod error;
+#[cfg(feature = "gui")]
+pub mod gui;
 pub mod muxer;
 pub mod performance;
 pub mod pipeline;

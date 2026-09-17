@@ -18,6 +18,7 @@ synchronisation A/V et les choix de performance.
 | | |
 |---|---|
 | **Linux** | implémenté, compilé, testé et mesuré |
+| **Interface graphique** | GTK 4 / libadwaita, optionnelle (`--features gui`) |
 | **Windows** | non implémenté — voir [Portage](#portage) |
 | **macOS** | non implémenté |
 
@@ -44,6 +45,7 @@ Dérive A/V       : −0.24 ms sur 20 s
 | PipeWire | 0.3 ou plus récent, avec `xdg-desktop-portal` |
 | PulseAudio | bibliothèque cliente (fournie par `pipewire-pulse` sur une machine moderne) |
 | clang | requis par `bindgen` pour les liaisons FFmpeg |
+| GTK / libadwaita | **seulement pour l'interface graphique** : GTK 4.10 et libadwaita 1.5 au minimum |
 
 Une session **Wayland ou X11** avec un portail de bureau actif
 (`xdg-desktop-portal-gnome`, `-kde`, `-wlr`, `-hyprland`…).
@@ -54,6 +56,8 @@ Une session **Wayland ou X11** avec un portail de bureau actif
 ```sh
 sudo pacman -S --needed rust ffmpeg pipewire libpulse clang pkgconf \
                         xdg-desktop-portal
+# pour l'interface graphique uniquement :
+sudo pacman -S --needed gtk4 libadwaita
 # puis le backend correspondant à votre bureau :
 sudo pacman -S xdg-desktop-portal-kde     # Plasma
 sudo pacman -S xdg-desktop-portal-gnome   # GNOME
@@ -67,6 +71,8 @@ sudo apt install build-essential pkg-config clang \
      libswscale-dev libswresample-dev \
      libpipewire-0.3-dev libspa-0.2-dev libpulse-dev \
      xdg-desktop-portal xdg-desktop-portal-gtk
+# pour l'interface graphique uniquement :
+sudo apt install libgtk-4-dev libadwaita-1-dev
 ```
 
 **Fedora**
@@ -74,6 +80,8 @@ sudo apt install build-essential pkg-config clang \
 sudo dnf install clang pkgconf-pkg-config \
      ffmpeg-devel pipewire-devel pulseaudio-libs-devel \
      xdg-desktop-portal
+# pour l'interface graphique uniquement :
+sudo dnf install gtk4-devel libadwaita-devel
 ```
 
 ### Accélération matérielle
@@ -128,6 +136,17 @@ cargo build --release
 ```
 
 Le binaire est dans `target/release/rscap`.
+
+L'interface graphique est un **second binaire**, derrière un drapeau de
+compilation :
+
+```sh
+cargo build --release --features gui
+```
+
+Elle produit `target/release/rscap-gui`. Sans `--features gui`, aucune liaison
+GTK n'est téléchargée ni compilée : `rscap` reste utilisable sur une machine
+sans bureau — un serveur, un conteneur d'intégration continue.
 
 Installation facultative :
 
@@ -219,6 +238,46 @@ rscap --help
 
 ---
 
+## Interface graphique
+
+```sh
+rscap-gui
+```
+
+La fenêtre pilote **la même bibliothèque** que la ligne de commande : même
+configuration, même validation, même pipeline, mêmes compteurs. Un réglage qui
+n'existe pas dans `rscap.toml` n'existe pas non plus dans la fenêtre.
+
+| Page | Contenu |
+|---|---|
+| **Capture** | bouton d'enregistrement, durée, taille, et le tableau de bord complet — cadence, images perdues/dupliquées/fusionnées, dérive A/V, files, débits, latences, surcharges |
+| **Vidéo** | FPS, codec, qualité, débit, contrôle de débit, cadencement, politique matérielle, encodeur imposé, nœud de rendu, images clés, images B, preset, anticipation, fils de conversion |
+| **Audio** | activation, moniteur de sortie (liste peuplée au démarrage), fréquence, canaux, débit, fragment, correction de dérive, dérive maximale |
+| **Sortie** | fichier (avec sélecteur), conteneur, MP4 fragmenté, arrêt automatique, tampon d'écriture |
+| **Pipeline** | tailles des trois files, pool de tampons, sources synthétiques |
+| **Matériel** | sondage des encodeurs et banc d'essai, rapport affiché tel quel |
+
+Le menu charge et enregistre un `rscap.toml`, directement relisible par
+`rscap --config`, et permet d'oublier l'autorisation d'écran du portail.
+
+**Trois garanties structurelles :**
+
+- *La fenêtre ne bloque jamais.* Portail, encodeurs, enregistrement,
+  finalisation et banc d'essai vivent dans un thread séparé qui communique par
+  messages. Le thread principal ne fait que dessiner.
+- *Les statistiques ne coûtent rien au pipeline.* Elles voyagent par copie
+  d'une photo de compteurs atomiques : aucun verrou du chemin chaud n'est pris
+  pour afficher quoi que ce soit.
+- *Fermer la fenêtre pendant un enregistrement ne le perd pas.* La fermeture
+  est retenue, l'arrêt propre est demandé, et la fenêtre ne se ferme qu'une
+  fois le fichier finalisé et synchronisé sur le disque.
+
+Pendant un enregistrement, les pages de réglages sont grisées : la
+configuration est celle qui a été confiée au pipeline, la modifier n'aurait
+aucun effet et laisserait croire le contraire.
+
+---
+
 ## Configuration
 
 `rscap.toml` documente chaque option. Extrait :
@@ -298,8 +357,9 @@ La cible n'est déclarée tenue que si le FPS réel atteint 99 % de la cible
 ## Tests
 
 ```sh
-cargo test              # 133 tests
-cargo test --release    # plus rapide pour les tests de bout en bout
+cargo test                      # 133 tests
+cargo test --features gui       # 136 tests, interface comprise
+cargo test --release            # plus rapide pour les tests de bout en bout
 cargo clippy --all-targets
 ```
 
@@ -315,6 +375,7 @@ Couverture :
 | Muxage | fichier finalisé, relisible, MP4 fragmenté, MKV |
 | Configuration | valeurs limites, clés inconnues, cohérence |
 | Arrêt | finalisation même sur arrêt immédiat |
+| Interface | le thread de commande enregistre, s'arrête à la demande comme à l'échéance, et rapporte une configuration refusée sans rien ouvrir |
 
 Les tests d'intégration (`tests/recording.rs`) enregistrent réellement puis
 **relisent et décodent** le fichier produit : ordre des paquets, PTS/DTS,
@@ -355,7 +416,14 @@ src/
 │   └── sync.rs          barrière de départ commune
 ├── performance/         compteurs atomiques, histogrammes, CPU/GPU/mémoire
 ├── bench/               banc d'essai et diagnostic
-└── ui/                  bannière, tableau de bord, résumé
+├── ui/                  bannière, tableau de bord, résumé (terminal)
+├── gui/                 interface GTK 4, optionnelle
+│   ├── mod.rs           fenêtre, pages, machine d'états
+│   ├── controller.rs    thread de commande, messages, arrêt garanti
+│   ├── settings.rs      un widget par champ de configuration
+│   └── stats.rs         tableau de bord temps réel
+└── bin/
+    └── rscap-gui.rs     binaire de l'interface (--features gui)
 ```
 
 ---
@@ -375,6 +443,7 @@ src/
 | `thiserror` | erreurs typées avec `source`, sans code répétitif. |
 | `tracing` + `tracing-appender` | journalisation structurée **non bloquante** : un journal ne doit jamais faire attendre un thread temps réel. |
 | `tokio` | uniquement pour la négociation D-Bus du portail, qui est intrinsèquement asynchrone et se produit une seule fois. Le reste du programme est en threads dédiés. |
+| `gtk4` + `libadwaita` | **optionnelles, feature `gui`.** GTK 4 est la seule boîte à outils qui rende correctement sous Wayland *et* X11 sans couche de compatibilité, et libadwaita fournit les pages de préférences, les points de rupture adaptatifs et les dialogues modernes — sinon réécrits à la main. `gtk::FileDialog` (4.10) et `adw::AlertDialog` (1.5) remplacent des API dépréciées qui se comportent mal sous Wayland. |
 | `clap`, `serde`, `toml`, `libc`, `ctrlc` | usages standards. |
 
 Crates volontairement **écartées** :

@@ -1,5 +1,7 @@
 # rscap
 
+[![CI](https://github.com/stefan-cambodia/capture/actions/workflows/ci.yml/badge.svg)](https://github.com/stefan-cambodia/capture/actions/workflows/ci.yml)
+
 Enregistreur d'écran temps réel en Rust : écran principal en plein écran, son
 système synchronisé, encodage matériel, **30 FPS minimum et 60 FPS quand la
 machine le permet**.
@@ -131,7 +133,7 @@ prouve rien, seul l'ouverture le fait.
 ## Compilation
 
 ```sh
-git clone <dépôt> && cd capturevideo
+git clone https://github.com/stefan-cambodia/capture.git && cd capture
 cargo build --release
 ```
 
@@ -479,4 +481,8 @@ et `AudioSource`. Ajouter un système revient à écrire un module de capture.
 
 ## Licence
 
-MIT ou Apache-2.0, au choix.
+Au choix : [MIT](LICENSE-MIT) ou [Apache-2.0](LICENSE-APACHE).
+
+Sauf mention contraire explicite, toute contribution volontairement soumise
+pour inclusion dans ce projet est fournie sous cette double licence, sans
+condition supplémentaire.

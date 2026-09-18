@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Compilation, lint et tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ffmpeg, pipewire et pulseaudio sont requis meme sans interface : les
+      # liaisons sont construites par bindgen a partir des en-tetes du systeme.
+      # gtk4 et libadwaita ne servent qu'a la feature "gui".
+      - name: Dependances systeme
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang pkg-config \
+            libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev \
+            libswscale-dev libswresample-dev \
+            libpipewire-0.3-dev libspa-0.2-dev libpulse-dev \
+            libgtk-4-dev libadwaita-1-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Les deux configurations sont verifiees separement : la feature "gui"
+      # ajoute du code, elle n'en remplace pas. Une regression dans l'une ne
+      # doit pas pouvoir se cacher derriere l'autre.
+      - name: Clippy (sans interface)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Clippy (avec interface)
+        run: cargo clippy --all-targets --features gui -- -D warnings
+
+      # Les tests n'ont besoin d'aucun ecran : la capture reelle passe par
+      # xdg-desktop-portal, qui exige un consentement interactif, donc toute
+      # la suite utilise les sources synthetiques.
+      - name: Tests (sans interface)
+        run: cargo test --verbose
+
+      - name: Tests (avec interface)
+        run: cargo test --features gui --verbose

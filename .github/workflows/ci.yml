@@ -14,7 +14,10 @@ env:
 jobs:
   test:
     name: Compilation, lint et tests
-    runs-on: ubuntu-latest
+    # Version epinglee, et non "ubuntu-latest" : le projet exige FFmpeg 7.1 au
+    # minimum (voir README) et Ubuntu 24.04 n'en fournit que 6.1. Un flottement
+    # de l'image ne doit pas pouvoir casser la compilation du jour au lendemain.
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v5
 

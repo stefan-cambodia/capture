@@ -43,11 +43,21 @@ Dérive A/V       : −0.24 ms sur 20 s
 | | |
 |---|---|
 | Rust | 1.82 ou plus récent |
-| FFmpeg | bibliothèques de développement, version 6 à 9 |
+| FFmpeg | bibliothèques de développement, **7.1 minimum** |
 | PipeWire | 0.3 ou plus récent, avec `xdg-desktop-portal` |
 | PulseAudio | bibliothèque cliente (fournie par `pipewire-pulse` sur une machine moderne) |
 | clang | requis par `bindgen` pour les liaisons FFmpeg |
 | GTK / libadwaita | **seulement pour l'interface graphique** : GTK 4.10 et libadwaita 1.5 au minimum |
+
+FFmpeg 7.1 est un vrai plancher, pas une précaution : le convertisseur
+colorimétrique utilise `sws_scale_frame` en mode dynamique, règle `threads` et
+`flags` directement sur le `SwsContext` — devenu structure publique en 7.1 — et
+le libère avec `sws_free_context`, apparu au même moment. Sur FFmpeg 6 la
+compilation échoue franchement, elle ne dégrade pas silencieusement.
+
+Vérifié sur FFmpeg 8 (intégration continue) et 9 (machine de développement).
+Attention : Ubuntu 24.04 ne fournit que FFmpeg 6.1, trop ancien ; Ubuntu 26.04,
+Debian 13 et les distributions à publication continue conviennent.
 
 Une session **Wayland ou X11** avec un portail de bureau actif
 (`xdg-desktop-portal-gnome`, `-kde`, `-wlr`, `-hyprland`…).

@@ -14,7 +14,7 @@ jobs:
     name: Compilation, lint et tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # ffmpeg, pipewire et pulseaudio sont requis meme sans interface : les
       # liaisons sont construites par bindgen a partir des en-tetes du systeme.
@@ -31,24 +31,61 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
+          components: clippy
 
       - uses: Swatinem/rust-cache@v2
+
+      # Les journaux d'execution demandent des droits d'administration sur le
+      # depot ; les annotations, non. Les versions qui conditionnent tout le
+      # reste passent donc par une annotation, ou elles restent lisibles.
+      - name: Versions
+        shell: bash
+        run: |
+          echo "::notice title=Rust::$(rustc --version) / $(cargo clippy --version)"
+          echo "::notice title=FFmpeg::libavcodec $(pkg-config --modversion libavcodec), libavformat $(pkg-config --modversion libavformat)"
+          echo "::notice title=GTK::gtk4 $(pkg-config --modversion gtk4), libadwaita $(pkg-config --modversion libadwaita-1)"
 
       # Les deux configurations sont verifiees separement : la feature "gui"
       # ajoute du code, elle n'en remplace pas. Une regression dans l'une ne
       # doit pas pouvoir se cacher derriere l'autre.
       - name: Clippy (sans interface)
-        run: cargo clippy --all-targets -- -D warnings
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --all-targets --message-format=short 2>&1 | tee /tmp/clippy-sans-gui.txt
 
       - name: Clippy (avec interface)
-        run: cargo clippy --all-targets --features gui -- -D warnings
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --all-targets --features gui --message-format=short 2>&1 | tee /tmp/clippy-avec-gui.txt
 
       # Les tests n'ont besoin d'aucun ecran : la capture reelle passe par
       # xdg-desktop-portal, qui exige un consentement interactif, donc toute
       # la suite utilise les sources synthetiques.
       - name: Tests (sans interface)
-        run: cargo test --verbose
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test 2>&1 | tee /tmp/test-sans-gui.txt
 
       - name: Tests (avec interface)
-        run: cargo test --features gui --verbose
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --features gui 2>&1 | tee /tmp/test-avec-gui.txt
+
+      # Sans cette etape, un echec se resume a « exit code 101 » pour qui n'a
+      # pas acces aux journaux. Chaque diagnostic remonte en annotation.
+      - name: Diagnostic de l'echec
+        if: failure()
+        shell: bash
+        run: |
+          for f in /tmp/clippy-*.txt /tmp/test-*.txt; do
+            [ -f "$f" ] || continue
+            grep -E "^(error|warning)|: (error|warning)|^test .* FAILED|panicked at" "$f" \
+              | head -25 \
+              | while IFS= read -r line; do
+                  echo "::error title=$(basename "$f")::${line}"
+                done
+          done

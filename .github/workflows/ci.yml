@@ -7,7 +7,9 @@ on:
   workflow_dispatch:
 
 env:
-  CARGO_TERM_COLOR: always
+  # Surtout pas "always" : les sequences ANSI se glissent au milieu des mots
+  # et rendent la sortie illisible pour le filtre du diagnostic ci-dessous.
+  CARGO_TERM_COLOR: never
 
 jobs:
   test:
@@ -81,11 +83,19 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          for f in /tmp/clippy-*.txt /tmp/test-*.txt; do
+          # Ce diagnostic ne doit jamais masquer l'echec qu'il explique : il
+          # rend toujours 0, et un filtre bredouille retombe sur la fin brute
+          # du fichier plutot que de ne rien dire.
+          set +e
+          for f in /tmp/clippy-sans-gui.txt /tmp/clippy-avec-gui.txt \
+                   /tmp/test-sans-gui.txt /tmp/test-avec-gui.txt; do
             [ -f "$f" ] || continue
-            grep -E "^(error|warning)|: (error|warning)|^test .* FAILED|panicked at" "$f" \
-              | head -25 \
-              | while IFS= read -r line; do
-                  echo "::error title=$(basename "$f")::${line}"
-                done
+            name=$(basename "$f")
+            clean=$(sed -r 's/\x1b\[[0-9;]*[a-zA-Z]//g' "$f")
+            lines=$(echo "$clean" | grep -E "error|warning:|panicked at|FAILED" | head -20)
+            [ -z "$lines" ] && lines=$(echo "$clean" | tail -20)
+            echo "$lines" | while IFS= read -r line; do
+              [ -n "$line" ] && echo "::error title=${name}::${line}"
+            done
           done
+          exit 0
